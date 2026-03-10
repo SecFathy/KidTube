@@ -46,6 +46,11 @@ class ParentDashboardScreen extends StatelessWidget {
                       '${provider.allVideos.length}',
                       Icons.play_circle_outline,
                       AppColors.ytRed,
+                      onTap: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                            builder: (context) => const ManageVideosScreen()),
+                      ),
                     ),
                     const SizedBox(width: 12),
                     _buildStatCard(
@@ -53,6 +58,11 @@ class ParentDashboardScreen extends StatelessWidget {
                       '${provider.shorts.length}',
                       Icons.flash_on,
                       Colors.orange,
+                      onTap: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                            builder: (context) => const ManageVideosScreen()),
+                      ),
                     ),
                     const SizedBox(width: 12),
                     _buildStatCard(
@@ -60,6 +70,11 @@ class ParentDashboardScreen extends StatelessWidget {
                       '${provider.allowedChannels.length}',
                       Icons.people_outline,
                       Colors.blue,
+                      onTap: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                            builder: (context) => const ManageChannelsScreen()),
+                      ),
                     ),
                   ],
                 ),
@@ -132,32 +147,36 @@ class ParentDashboardScreen extends StatelessWidget {
   }
 
   Widget _buildStatCard(
-      String label, String value, IconData icon, Color color) {
+      String label, String value, IconData icon, Color color,
+      {VoidCallback? onTap}) {
     return Expanded(
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: AppColors.ytDarkSurface,
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Column(
-          children: [
-            Icon(icon, color: color, size: 28),
-            const SizedBox(height: 8),
-            Text(
-              value,
-              style: const TextStyle(
-                color: AppColors.white,
-                fontSize: 24,
-                fontWeight: FontWeight.w700,
+      child: GestureDetector(
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: AppColors.ytDarkSurface,
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Column(
+            children: [
+              Icon(icon, color: color, size: 28),
+              const SizedBox(height: 8),
+              Text(
+                value,
+                style: const TextStyle(
+                  color: AppColors.white,
+                  fontSize: 24,
+                  fontWeight: FontWeight.w700,
+                ),
               ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              label,
-              style: const TextStyle(color: AppColors.ytGrey, fontSize: 12),
-            ),
-          ],
+              const SizedBox(height: 4),
+              Text(
+                label,
+                style: const TextStyle(color: AppColors.ytGrey, fontSize: 12),
+              ),
+            ],
+          ),
         ),
       ),
     );

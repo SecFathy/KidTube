@@ -42,6 +42,12 @@ class AppProvider extends ChangeNotifier {
     _allowedChannels = await _db.getAllowedChannels();
     _blockedChannels = await _db.getBlockedChannels();
 
+    if (_allowedChannels.length > 4) {
+      _allVideos.shuffle();
+      _regularVideos.shuffle();
+      _shorts.shuffle();
+    }
+
     _isLoading = false;
     notifyListeners();
   }

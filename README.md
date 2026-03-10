@@ -14,8 +14,10 @@
 
 <p align="center">
   Parents control everything. Kids see only what you approve.<br/>
-  Familiar YouTube interface. Zero exposure to unwanted content.
+  YouTube-like interface. Zero exposure to unwanted content.
 </p>
+
+> **Disclaimer:** KidTube is **not** affiliated with, endorsed by, or associated with YouTube or Google in any way. The app uses a YouTube-like UI design purely to provide a familiar viewing experience for children. All YouTube trademarks belong to Google LLC. This is an independent, open-source parental control project.
 
 ---
 
@@ -23,7 +25,7 @@
 
 YouTube has billions of videos. Not all of them are safe for children. Even YouTube Kids has been criticized for letting inappropriate content slip through automated filters.
 
-**KidTube** gives parents complete, manual control over every single video their children can watch — while keeping the interface familiar and easy to use.
+**KidTube** gives parents complete, manual control over every single video their children can watch — while keeping the interface familiar and easy to use. The app mimics the look and feel of the YouTube mobile app so children feel comfortable using it, but every piece of content is hand-approved by a parent.
 
 ## How It Works
 
@@ -32,17 +34,18 @@ YouTube has billions of videos. Not all of them are safe for children. Even YouT
 | **Child** | A YouTube-like app with only parent-approved videos and channels |
 | **Parent** | A PIN-protected dashboard to add, remove, and manage all content |
 
-Children **cannot** search YouTube, browse freely, or access anything the parent hasn't explicitly approved.
+Children **cannot** search YouTube, browse freely, or access anything the parent hasn't explicitly approved. The familiar YouTube-style interface means kids won't notice the difference — they just see a curated, safe version.
 
 ## Features
 
 ### For Kids
-- YouTube-identical dark mode UI
+- YouTube-style dark mode UI (looks and feels like the real app)
 - Home feed with filter chips (All, Music, Gaming, etc.)
 - Shorts with full-screen vertical swipe player
 - Subscriptions tab with channel avatars
 - Video player with suggestions
 - Library / "You" tab
+- Auto-shuffled homepage when 4+ channels are added for content variety
 
 ### For Parents (PIN-Protected)
 - **Add videos by URL** — paste any YouTube link
@@ -51,7 +54,7 @@ Children **cannot** search YouTube, browse freely, or access anything the parent
 - **Block channels** — blocked channels can never have videos added
 - **Remove videos** — swipe to delete or tap remove
 - **Change PIN** — set a custom 4-6 digit PIN
-- **Dashboard stats** — see total videos, shorts, and channels at a glance
+- **Clickable dashboard stats** — tap Videos, Shorts, or Channels cards to jump directly to management screens
 
 ### Technical
 - Embedded YouTube player (no external app needed)
@@ -126,7 +129,7 @@ flutter build ipa --release
 
 ### First Launch
 
-1. Open the app — you'll see the YouTube-like home screen (empty)
+1. Open the app — you'll see the YouTube-style home screen (empty)
 2. **Long-press** the profile avatar (top-right) to access Parent Mode
 3. Enter the default PIN: **`1234`**
 4. Start adding videos and channels from the Parent Dashboard
@@ -139,6 +142,7 @@ flutter build ipa --release
 | Add a channel | Tap "Add Channel" → paste channel URL (e.g., `https://youtube.com/@Cocomelon`) |
 | Search & add | Tap "Search & Add Videos" → search by topic → tap + to approve |
 | Remove a video | "Manage Videos" → swipe left or tap trash icon |
+| Quick manage | Tap the Videos, Shorts, or Channels stat cards to jump directly to management |
 | Block a channel | "Manage Channels" → Allowed tab → tap block icon |
 | Unblock a channel | "Manage Channels" → Blocked tab → tap unblock icon |
 | Change PIN | Tap the gear icon → enter new 4-6 digit PIN |
@@ -162,6 +166,12 @@ flutter build ipa --release
 - **No API keys** — uses `youtube_explode_dart` which scrapes public YouTube data
 - **No accounts** — no sign-up, no login, no tracking
 - **PIN-protected** — parent controls are hidden behind a PIN that kids won't discover easily (long-press on avatar)
+
+## Disclaimer
+
+This project is **not** an official YouTube product. It is not affiliated with, endorsed by, or connected to YouTube, Google, or Alphabet Inc. in any way. The YouTube-like interface is used solely to provide children with a familiar and comfortable viewing experience. All content is fetched from publicly available YouTube data. "YouTube" and the YouTube logo are trademarks of Google LLC.
+
+This app is intended for personal, non-commercial use as a parental control tool.
 
 ## Roadmap
 
@@ -188,12 +198,13 @@ This project is licensed under the MIT License — see the [LICENSE](LICENSE) fi
 
 ## Acknowledgments
 
-- UI inspired by [YouTube](https://youtube.com) mobile app
+- UI design inspired by the [YouTube](https://youtube.com) mobile app (not affiliated)
 - Built with [Flutter](https://flutter.dev)
 - YouTube data powered by [youtube_explode_dart](https://pub.dev/packages/youtube_explode_dart)
 
 ---
 
 <p align="center">
-  <strong>Built with care for parents who want their kids safe online.</strong>
+  <strong>Built with care for parents who want their kids safe online.</strong><br/>
+  <sub>This is an independent project. Not affiliated with YouTube or Google.</sub>
 </p>
