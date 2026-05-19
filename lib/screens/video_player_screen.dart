@@ -102,6 +102,96 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
     );
   }
 
+  //OG
+  void _showQualitySelector(BuildContext context) {
+  final provider = context.read<AppProvider>();
+  final qualities = [
+    {'value': 'auto', 'label': 'Auto',    'desc': 'Adjusts to your connection'},
+    {'value': '144',  'label': '144p',    'desc': 'Saves the most data'},
+    {'value': '240',  'label': '240p',    'desc': 'Low data usage'},
+    {'value': '360',  'label': '360p',    'desc': 'Balanced'},
+    {'value': '480',  'label': '480p',    'desc': 'Good quality'},
+    {'value': '720',  'label': '720p HD', 'desc': 'High definition'},
+  ];
+
+  showModalBottomSheet(
+    context: context,
+    backgroundColor: const Color(0xFF212121),
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+    ),
+    builder: (_) => StatefulBuilder(
+      builder: (context, setModalState) => Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const SizedBox(height: 12),
+          Container(
+            width: 40, height: 4,
+            decoration: BoxDecoration(
+              color: Colors.white24,
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          const Padding(
+            padding: EdgeInsets.all(16),
+            child: Text('Video quality',
+              style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w600)),
+          ),
+          const Divider(color: Colors.white12, height: 1),
+          ...qualities.map((q) {
+            final isSelected = provider.videoQuality == q['value'];
+            return ListTile(
+              leading: Icon(
+                isSelected ? Icons.radio_button_checked : Icons.radio_button_off,
+                color: isSelected ? AppColors.ytRed : Colors.white54,
+                size: 20,
+              ),
+              title: Text(q['label']!,
+                style: TextStyle(
+                  color: isSelected ? Colors.white : Colors.white70,
+                  fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                )),
+              subtitle: Text(q['desc']!,
+                style: const TextStyle(color: Colors.white38, fontSize: 12)),
+              trailing: (q['value'] == '144' || q['value'] == '240')
+                ? Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: Colors.green.withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(4),
+                      border: Border.all(color: Colors.green.withOpacity(0.5)),
+                    ),
+                    child: const Text('Saves data',
+                      style: TextStyle(color: Colors.green, fontSize: 10)),
+                  )
+                : null,
+              onTap: () {
+                provider.setVideoQuality(q['value']!);
+                final forceHD = q['value'] == '720';
+                _controller.updateValue(
+                  _controller.value.copyWith(),
+                );
+                _controller = YoutubePlayerController(
+                  initialVideoId: widget.video.youtubeVideoId,
+                  flags: YoutubePlayerFlags(
+                    autoPlay: true,
+                    mute: false,
+                    forceHD: forceHD,
+                    enableCaption: true,
+                  ),
+                );
+                setState(() {});
+                Navigator.pop(context);
+              },
+            );
+          }),
+          const SizedBox(height: 16),
+        ],
+      ),
+    ),
+  );
+}
+  //
   Widget _buildTitleSection() {
     return GestureDetector(
       onTap: () => setState(() => _titleExpanded = !_titleExpanded),
@@ -232,12 +322,41 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
     );
   }
 
+  //OG
   Widget _buildActionButtons() {
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      child: Row(
+  return SingleChildScrollView(
+    scrollDirection: Axis.horizontal,
+    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+    child: Consumer<AppProvider>(
+      builder: (context, provider, _) => Row(
         children: [
+          // Quality button
+          GestureDetector(
+            onTap: () => _showQualitySelector(context),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: AppColors.ytChipBg,
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.hd, color: AppColors.white, size: 18),
+                  const SizedBox(width: 6),
+                  Text(
+                    provider.videoQuality == 'auto' ? 'Auto' : '${provider.videoQuality}p',
+                    style: const TextStyle(
+                      color: AppColors.white,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
           _buildActionChip(Icons.thumb_up_outlined, 'Like'),
           const SizedBox(width: 8),
           _buildActionChip(Icons.thumb_down_outlined, ''),
@@ -253,9 +372,10 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
           _buildActionChip(Icons.flag_outlined, 'Report'),
         ],
       ),
-    );
-  }
-
+    ),
+  );
+}
+  //
   Widget _buildActionChip(IconData icon, String label,
       {bool flipped = false}) {
     return Container(
