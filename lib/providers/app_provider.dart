@@ -16,7 +16,10 @@ class AppProvider extends ChangeNotifier {
   bool _isLoading = false;
   bool _isParentMode = false;
   String _parentPin = '1234';
-
+  //OG
+  String _videoQuality = 'auto';
+  //
+  
   List<VideoItem> get allVideos => _allVideos;
   List<VideoItem> get regularVideos => _regularVideos;
   List<VideoItem> get shorts => _shorts;
@@ -25,10 +28,16 @@ class AppProvider extends ChangeNotifier {
   bool get isLoading => _isLoading;
   bool get isParentMode => _isParentMode;
   String get parentPin => _parentPin;
-
+  //OG
+  String get videoQuality => _videoQuality;
+  //
   Future<void> init() async {
     final savedPin = await _db.getSetting('parent_pin');
     if (savedPin != null) _parentPin = savedPin;
+    //OG
+    final savedQuality = await _db.getSetting('video_quality'); // ADD THIS
+    if (savedQuality != null) _videoQuality = savedQuality;    // ADD THIS
+    //
     await loadAllData();
   }
 
@@ -61,6 +70,13 @@ class AppProvider extends ChangeNotifier {
     await _db.setSetting('parent_pin', newPin);
     notifyListeners();
   }
+  //OG
+  Future<void> setVideoQuality(String quality) async {
+  _videoQuality = quality;
+  await _db.setSetting('video_quality', quality);
+  notifyListeners();
+}
+  //
 
   void enterParentMode() {
     _isParentMode = true;
