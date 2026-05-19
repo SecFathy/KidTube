@@ -3,7 +3,10 @@ import 'package:youtube_player_flutter/youtube_player_flutter.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../models/video_item.dart';
 import '../utils/constants.dart';
-
+//OG
+import 'package:provider/provider.dart';
+import '../providers/app_provider.dart';
+//
 class ShortsPlayerScreen extends StatefulWidget {
   final List<VideoItem> shorts;
   final int initialIndex;
@@ -277,11 +280,29 @@ class _ShortsPlayerScreenState extends State<ShortsPlayerScreen> {
                       color: Colors.white, size: 24),
                   onPressed: () {},
                 ),
+                
+                //OG
+                // Quality button
+                Consumer<AppProvider>(
+                  builder: (context, provider, _) => IconButton(
+                    icon: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.hd, color: Colors.white, size: 20),
+                        Text(
+                          provider.videoQuality == 'auto' ? 'Auto' : '${provider.videoQuality}p',
+                          style: const TextStyle(color: Colors.white70, fontSize: 9),
+                        ),
+                      ],
+                    ),
+                    onPressed: () => _showQualitySelector(context),
+                  ),
+                ),
                 IconButton(
-                  icon: const Icon(Icons.more_vert,
-                      color: Colors.white, size: 24),
+                  icon: const Icon(Icons.more_vert, color: Colors.white, size: 24),
                   onPressed: () {},
                 ),
+                //
               ],
             ),
           ),
@@ -290,6 +311,100 @@ class _ShortsPlayerScreenState extends State<ShortsPlayerScreen> {
     );
   }
 
+  //OG
+  void _showQualitySelector(BuildContext context) {
+  final provider = context.read<AppProvider>();
+  final qualities = [
+    {'value': 'auto', 'label': 'Auto',    'desc': 'Adjusts to your connection'},
+    {'value': '144',  'label': '144p',    'desc': 'Saves the most data'},
+    {'value': '240',  'label': '240p',    'desc': 'Low data usage'},
+    {'value': '360',  'label': '360p',    'desc': 'Balanced'},
+    {'value': '480',  'label': '480p',    'desc': 'Good quality'},
+    {'value': '720',  'label': '720p HD', 'desc': 'High definition'},
+  ];
+
+  showModalBottomSheet(
+    context: context,
+    backgroundColor: const Color(0xFF212121),
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+    ),
+    builder: (_) => StatefulBuilder(
+      builder: (context, setModalState) => Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const SizedBox(height: 12),
+          Container(
+            width: 40, height: 4,
+            decoration: BoxDecoration(
+              color: Colors.white24,
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          const Padding(
+            padding: EdgeInsets.all(16),
+            child: Text('Video quality',
+              style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w600)),
+          ),
+          const Divider(color: Colors.white12, height: 1),
+          ...qualities.map((q) {
+            final isSelected = provider.videoQuality == q['value'];
+            return ListTile(
+              leading: Icon(
+                isSelected ? Icons.radio_button_checked : Icons.radio_button_off,
+                color: isSelected ? AppColors.ytRed : Colors.white54,
+                size: 20,
+              ),
+              title: Text(q['label']!,
+                style: TextStyle(
+                  color: isSelected ? Colors.white : Colors.white70,
+                  fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                )),
+              subtitle: Text(q['desc']!,
+                style: const TextStyle(color: Colors.white38, fontSize: 12)),
+              trailing: (q['value'] == '144' || q['value'] == '240')
+                ? Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: Colors.green.withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(4),
+                      border: Border.all(color: Colors.green.withOpacity(0.5)),
+                    ),
+                    child: const Text('Saves data',
+                      style: TextStyle(color: Colors.green, fontSize: 10)),
+                  )
+                : null,
+              onTap: () {
+                provider.setVideoQuality(q['value']!);
+                final forceHD = q['value'] == '720';
+                // Rebuild all active controllers with new quality
+                for (final entry in _controllers.entries) {
+                  final videoId = widget.shorts[entry.key].youtubeVideoId;
+                  _controllers[entry.key] = YoutubePlayerController(
+                    initialVideoId: videoId,
+                    flags: YoutubePlayerFlags(
+                      autoPlay: entry.key == _currentIndex,
+                      mute: false,
+                      loop: true,
+                      hideControls: true,
+                      forceHD: forceHD,
+                      showLiveFullscreenButton: false,
+                      controlsVisibleAtStart: false,
+                    ),
+                  );
+                }
+                setState(() {});
+                Navigator.pop(context);
+              },
+            );
+          }),
+          const SizedBox(height: 16),
+        ],
+      ),
+    ),
+  );
+}
+  //
   Widget _buildSideAction(IconData icon, String label) {
     return Column(
       children: [
