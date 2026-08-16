@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:youtube_player_flutter/youtube_player_flutter.dart';
+import 'package:video_player/video_player.dart';
+import 'package:youtube_explode_dart/youtube_explode_dart.dart';
 import 'package:provider/provider.dart';
 import 'package:timeago/timeago.dart' as timeago;
 import '../models/video_item.dart';
@@ -18,110 +19,117 @@ class VideoPlayerScreen extends StatefulWidget {
 }
 
 class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
-  late YoutubePlayerController _controller;
+  VideoPlayerController? _controller;
   bool _titleExpanded = false;
+  bool _isLoading = true;
+  bool _hasError = false;
+  String _errorMessage = '';
+  bool _showControls = true;
+
+  // Streams fetched from youtube_explode
+  List<MuxedStreamInfo> _streams = [];
+  MuxedStreamInfo? _currentStream;
+
+  final YoutubeExplode _yt = YoutubeExplode();
 
   @override
   void initState() {
     super.initState();
-    _controller = YoutubePlayerController(
-      initialVideoId: widget.video.youtubeVideoId,
-      flags: const YoutubePlayerFlags(
-        autoPlay: true,
-        mute: false,
-        disableDragSeek: false,
-        loop: false,
-        enableCaption: true,
-        forceHD: false,
-      ),
-    );
+    _loadStreams();
   }
 
-  @override
-  void dispose() {
-    _controller.dispose();
-    SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
-    super.dispose();
+  Future<void> _loadStreams() async {
+    setState(() {
+      _isLoading = true;
+      _hasError = false;
+    });
+
+    try {
+      final manifest = await _yt.videos.streamsClient
+          .getManifest(widget.video.youtubeVideoId);
+
+      final streams = manifest.muxed.toList();
+      streams.sort((a, b) =>
+          a.videoResolution.height.compareTo(b.videoResolution.height));
+
+      if (streams.isEmpty) {
+        setState(() {
+          _hasError = true;
+          _errorMessage = 'No streams available for this video.';
+          _isLoading = false;
+        });
+        return;
+      }
+
+      // Pick stream based on saved quality preference
+      final provider = context.read<AppProvider>();
+      final savedQuality = provider.videoQuality;
+      MuxedStreamInfo selected = streams.last; // default: highest
+
+      if (savedQuality != 'auto') {
+        final targetHeight = int.tryParse(savedQuality) ?? 0;
+        final match = streams.where(
+            (s) => s.videoResolution.height <= targetHeight).toList();
+        if (match.isNotEmpty) selected = match.last;
+      }
+
+      setState(() {
+        _streams = streams;
+        _currentStream = selected;
+      });
+
+      await _initPlayer(selected.url.toString());
+    } catch (e) {
+      setState(() {
+        _hasError = true;
+        _errorMessage = 'Failed to load video. Please try again.';
+        _isLoading = false;
+      });
+    }
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return YoutubePlayerBuilder(
-      onExitFullScreen: () {
-        SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
-      },
-      player: YoutubePlayer(
-        controller: _controller,
-        showVideoProgressIndicator: true,
-        progressIndicatorColor: AppColors.ytRed,
-        progressColors: const ProgressBarColors(
-          playedColor: AppColors.ytRed,
-          handleColor: AppColors.ytRed,
-          bufferedColor: Color(0x55FFFFFF),
-          backgroundColor: Color(0x33FFFFFF),
-        ),
-      ),
-      builder: (context, player) {
-        return Scaffold(
-          backgroundColor: AppColors.ytDarkBg,
-          body: SafeArea(
-            bottom: false,
-            child: Column(
-              children: [
-                // Player
-                player,
-                // Scrollable content below player
-                Expanded(
-                  child: SingleChildScrollView(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        // Title section (tappable to expand, like YouTube)
-                        _buildTitleSection(),
-                        const Divider(height: 0.5),
-                        // Channel section
-                        _buildChannelSection(),
-                        const Divider(height: 0.5),
-                        // Action buttons
-                        _buildActionButtons(),
-                        const Divider(height: 0.5),
-                        // Comments preview
-                        _buildCommentsPreview(),
-                        const Divider(height: 0.5),
-                        // Suggested videos
-                        _buildSuggestedVideos(),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
+  Future<void> _initPlayer(String url) async {
+    await _controller?.dispose();
+
+    final controller = VideoPlayerController.networkUrl(Uri.parse(url));
+    await controller.initialize();
+    controller.play();
+
+    setState(() {
+      _controller = controller;
+      _isLoading = false;
+    });
   }
 
-  //OG
+  Future<void> _switchQuality(MuxedStreamInfo stream) async {
+    final position = _controller?.value.position ?? Duration.zero;
+    setState(() => _isLoading = true);
+
+    await _controller?.dispose();
+
+    final controller = VideoPlayerController.networkUrl(
+        Uri.parse(stream.url.toString()));
+    await controller.initialize();
+    await controller.seekTo(position);
+    controller.play();
+
+    setState(() {
+      _controller = controller;
+      _currentStream = stream;
+      _isLoading = false;
+    });
+  }
+
   void _showQualitySelector(BuildContext context) {
-  final provider = context.read<AppProvider>();
-  final qualities = [
-    {'value': 'auto', 'label': 'Auto',    'desc': 'Adjusts to your connection'},
-    {'value': '144',  'label': '144p',    'desc': 'Saves the most data'},
-    {'value': '240',  'label': '240p',    'desc': 'Low data usage'},
-    {'value': '360',  'label': '360p',    'desc': 'Balanced'},
-    {'value': '480',  'label': '480p',    'desc': 'Good quality'},
-    {'value': '720',  'label': '720p HD', 'desc': 'High definition'},
-  ];
+    final provider = context.read<AppProvider>();
 
-  showModalBottomSheet(
-    context: context,
-    backgroundColor: const Color(0xFF212121),
-    shape: const RoundedRectangleBorder(
-      borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-    ),
-    builder: (_) => StatefulBuilder(
-      builder: (context, setModalState) => Column(
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: const Color(0xFF212121),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (_) => Column(
         mainAxisSize: MainAxisSize.min,
         children: [
           const SizedBox(height: 12),
@@ -135,63 +143,192 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
           const Padding(
             padding: EdgeInsets.all(16),
             child: Text('Video quality',
-              style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w600)),
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+              )),
           ),
           const Divider(color: Colors.white12, height: 1),
-          ...qualities.map((q) {
-            final isSelected = provider.videoQuality == q['value'];
+          ..._streams.reversed.map((stream) {
+            final height = stream.videoResolution.height;
+            final isSelected = _currentStream == stream;
+            final savedQ = height <= 240 ? 'Saves data' : null;
+
             return ListTile(
               leading: Icon(
-                isSelected ? Icons.radio_button_checked : Icons.radio_button_off,
+                isSelected
+                    ? Icons.radio_button_checked
+                    : Icons.radio_button_off,
                 color: isSelected ? AppColors.ytRed : Colors.white54,
                 size: 20,
               ),
-              title: Text(q['label']!,
+              title: Text(
+                '${height}p',
                 style: TextStyle(
                   color: isSelected ? Colors.white : Colors.white70,
-                  fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
-                )),
-              subtitle: Text(q['desc']!,
-                style: const TextStyle(color: Colors.white38, fontSize: 12)),
-              trailing: (q['value'] == '144' || q['value'] == '240')
-                ? Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: Colors.green.withOpacity(0.2),
-                      borderRadius: BorderRadius.circular(4),
-                      border: Border.all(color: Colors.green.withOpacity(0.5)),
-                    ),
-                    child: const Text('Saves data',
-                      style: TextStyle(color: Colors.green, fontSize: 10)),
-                  )
-                : null,
-              onTap: () {
-                provider.setVideoQuality(q['value']!);
-                final forceHD = q['value'] == '720';
-                _controller.updateValue(
-                  _controller.value.copyWith(),
-                );
-                _controller = YoutubePlayerController(
-                  initialVideoId: widget.video.youtubeVideoId,
-                  flags: YoutubePlayerFlags(
-                    autoPlay: true,
-                    mute: false,
-                    forceHD: forceHD,
-                    enableCaption: true,
-                  ),
-                );
-                setState(() {});
+                  fontWeight:
+                      isSelected ? FontWeight.w600 : FontWeight.normal,
+                ),
+              ),
+              subtitle: Text(
+                stream.videoQuality.toString().replaceAll('VideoQuality.', ''),
+                style: const TextStyle(color: Colors.white38, fontSize: 12),
+              ),
+              trailing: savedQ != null
+                  ? Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: Colors.green.withOpacity(0.2),
+                        borderRadius: BorderRadius.circular(4),
+                        border:
+                            Border.all(color: Colors.green.withOpacity(0.5)),
+                      ),
+                      child: Text(savedQ,
+                          style: const TextStyle(
+                              color: Colors.green, fontSize: 10)),
+                    )
+                  : null,
+              onTap: () async {
                 Navigator.pop(context);
+                provider.setVideoQuality(height.toString());
+                await _switchQuality(stream);
               },
             );
           }),
           const SizedBox(height: 16),
         ],
       ),
-    ),
-  );
-}
-  //
+    );
+  }
+
+  @override
+  void dispose() {
+    _controller?.dispose();
+    _yt.close();
+    SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: AppColors.ytDarkBg,
+      body: SafeArea(
+        bottom: false,
+        child: Column(
+          children: [
+            // Player
+            _buildPlayer(),
+            // Scrollable content
+            Expanded(
+              child: SingleChildScrollView(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildTitleSection(),
+                    const Divider(height: 0.5),
+                    _buildChannelSection(),
+                    const Divider(height: 0.5),
+                    _buildActionButtons(),
+                    const Divider(height: 0.5),
+                    _buildCommentsPreview(),
+                    const Divider(height: 0.5),
+                    _buildSuggestedVideos(),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPlayer() {
+    return AspectRatio(
+      aspectRatio: 16 / 9,
+      child: Container(
+        color: Colors.black,
+        child: _isLoading
+            ? const Center(
+                child: CircularProgressIndicator(color: AppColors.ytRed))
+            : _hasError
+                ? Center(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.error_outline,
+                            color: Colors.white54, size: 40),
+                        const SizedBox(height: 8),
+                        Text(_errorMessage,
+                            style: const TextStyle(
+                                color: Colors.white54, fontSize: 13)),
+                        const SizedBox(height: 12),
+                        TextButton(
+                          onPressed: _loadStreams,
+                          child: const Text('Retry',
+                              style: TextStyle(color: AppColors.ytRed)),
+                        ),
+                      ],
+                    ),
+                  )
+                : GestureDetector(
+                    onTap: () =>
+                        setState(() => _showControls = !_showControls),
+                    child: Stack(
+                      alignment: Alignment.center,
+                      children: [
+                        VideoPlayer(_controller!),
+                        // Progress bar
+                        Positioned(
+                          bottom: 0,
+                          left: 0,
+                          right: 0,
+                          child: VideoProgressIndicator(
+                            _controller!,
+                            allowScrubbing: true,
+                            colors: const VideoProgressColors(
+                              playedColor: AppColors.ytRed,
+                              bufferedColor: Colors.white24,
+                              backgroundColor: Colors.white12,
+                            ),
+                          ),
+                        ),
+                        // Play/pause overlay
+                        if (_showControls)
+                          GestureDetector(
+                            onTap: () {
+                              setState(() {
+                                _controller!.value.isPlaying
+                                    ? _controller!.pause()
+                                    : _controller!.play();
+                              });
+                            },
+                            child: Container(
+                              width: 56,
+                              height: 56,
+                              decoration: const BoxDecoration(
+                                color: Colors.black54,
+                                shape: BoxShape.circle,
+                              ),
+                              child: Icon(
+                                _controller!.value.isPlaying
+                                    ? Icons.pause
+                                    : Icons.play_arrow,
+                                color: Colors.white,
+                                size: 32,
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+      ),
+    );
+  }
+
   Widget _buildTitleSection() {
     return GestureDetector(
       onTap: () => setState(() => _titleExpanded = !_titleExpanded),
@@ -232,14 +369,10 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
             const SizedBox(height: 6),
             Text(
               '${widget.video.viewCount} views \u00B7 ${timeago.format(widget.video.publishedAt)}',
-              style: const TextStyle(
-                color: AppColors.ytGrey,
-                fontSize: 12,
-              ),
+              style: const TextStyle(color: AppColors.ytGrey, fontSize: 12),
             ),
             if (_titleExpanded) ...[
               const SizedBox(height: 12),
-              // Tags
               Wrap(
                 spacing: 6,
                 children: [
@@ -286,24 +419,19 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
           ),
           const SizedBox(width: 12),
           Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  widget.video.channelName,
-                  style: const TextStyle(
-                    color: AppColors.white,
-                    fontSize: 14,
-                    fontWeight: FontWeight.w500,
-                  ),
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ],
+            child: Text(
+              widget.video.channelName,
+              style: const TextStyle(
+                color: AppColors.white,
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
+              ),
+              overflow: TextOverflow.ellipsis,
             ),
           ),
-          // Subscribe button (YouTube style)
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            padding:
+                const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             decoration: BoxDecoration(
               color: AppColors.white,
               borderRadius: BorderRadius.circular(20),
@@ -322,60 +450,64 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
     );
   }
 
-  //OG
   Widget _buildActionButtons() {
-  return SingleChildScrollView(
-    scrollDirection: Axis.horizontal,
-    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-    child: Consumer<AppProvider>(
-      builder: (context, provider, _) => Row(
-        children: [
-          // Quality button
-          GestureDetector(
-            onTap: () => _showQualitySelector(context),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              decoration: BoxDecoration(
-                color: AppColors.ytChipBg,
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Icon(Icons.hd, color: AppColors.white, size: 18),
-                  const SizedBox(width: 6),
-                  Text(
-                    provider.videoQuality == 'auto' ? 'Auto' : '${provider.videoQuality}p',
-                    style: const TextStyle(
-                      color: AppColors.white,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w500,
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      child: Consumer<AppProvider>(
+        builder: (context, provider, _) => Row(
+          children: [
+            // Quality button
+            GestureDetector(
+              onTap: _streams.isEmpty
+                  ? null
+                  : () => _showQualitySelector(context),
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  color: AppColors.ytChipBg,
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.hd, color: AppColors.white, size: 18),
+                    const SizedBox(width: 6),
+                    Text(
+                      _currentStream != null
+                          ? '${_currentStream!.videoResolution.height}p'
+                          : 'Quality',
+                      style: const TextStyle(
+                        color: AppColors.white,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
-          ),
-          const SizedBox(width: 8),
-          _buildActionChip(Icons.thumb_up_outlined, 'Like'),
-          const SizedBox(width: 8),
-          _buildActionChip(Icons.thumb_down_outlined, ''),
-          const SizedBox(width: 8),
-          _buildActionChip(Icons.reply, 'Share', flipped: true),
-          const SizedBox(width: 8),
-          _buildActionChip(Icons.download_outlined, 'Download'),
-          const SizedBox(width: 8),
-          _buildActionChip(Icons.content_cut, 'Clip'),
-          const SizedBox(width: 8),
-          _buildActionChip(Icons.bookmark_border, 'Save'),
-          const SizedBox(width: 8),
-          _buildActionChip(Icons.flag_outlined, 'Report'),
-        ],
+            const SizedBox(width: 8),
+            _buildActionChip(Icons.thumb_up_outlined, 'Like'),
+            const SizedBox(width: 8),
+            _buildActionChip(Icons.thumb_down_outlined, ''),
+            const SizedBox(width: 8),
+            _buildActionChip(Icons.reply, 'Share', flipped: true),
+            const SizedBox(width: 8),
+            _buildActionChip(Icons.download_outlined, 'Download'),
+            const SizedBox(width: 8),
+            _buildActionChip(Icons.content_cut, 'Clip'),
+            const SizedBox(width: 8),
+            _buildActionChip(Icons.bookmark_border, 'Save'),
+            const SizedBox(width: 8),
+            _buildActionChip(Icons.flag_outlined, 'Report'),
+          ],
+        ),
       ),
-    ),
-  );
-}
-  //
+    );
+  }
+
   Widget _buildActionChip(IconData icon, String label,
       {bool flipped = false}) {
     return Container(
@@ -423,19 +555,15 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
         children: [
           const Row(
             children: [
-              Text(
-                'Comments',
-                style: TextStyle(
-                  color: AppColors.white,
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
+              Text('Comments',
+                  style: TextStyle(
+                      color: AppColors.white,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600)),
               SizedBox(width: 8),
-              Text(
-                '0',
-                style: TextStyle(color: AppColors.ytGrey, fontSize: 14),
-              ),
+              Text('0',
+                  style:
+                      TextStyle(color: AppColors.ytGrey, fontSize: 14)),
             ],
           ),
           const SizedBox(height: 8),
@@ -444,14 +572,14 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
               CircleAvatar(
                 radius: 12,
                 backgroundColor: AppColors.ytChipBg,
-                child: const Icon(Icons.person, color: AppColors.ytGrey, size: 14),
+                child: const Icon(Icons.person,
+                    color: AppColors.ytGrey, size: 14),
               ),
               const SizedBox(width: 8),
               const Expanded(
-                child: Text(
-                  'Add a comment...',
-                  style: TextStyle(color: AppColors.ytGrey, fontSize: 13),
-                ),
+                child: Text('Add a comment...',
+                    style: TextStyle(
+                        color: AppColors.ytGrey, fontSize: 13)),
               ),
             ],
           ),
